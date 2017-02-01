@@ -36,7 +36,9 @@ c1 = {
 }
 
 knownBooks = []
+bs = []
 customers = []
+cs = []
 
 # Getting the books in the library
 resp = r.get(url + '/books')
@@ -64,6 +66,7 @@ resp = r.post(url + '/books', json=b2)
 assert resp.status_code == 201
 knownBooks.append(j.loads(resp.text)['id'])
 
+
 sleep(WAIT) # waiting for the changes to propagate
 
 # Checking that they exist
@@ -74,6 +77,11 @@ assert len(j.loads(resp.text)) == 2
 # Deleting one book
 resp = r.delete(url + '/books/' + str(knownBooks[0]))
 assert resp.status_code == 200 or resp.status_code == 204
+
+# Can't delete already deleted book
+resp = r.delete(url + '/books/' + str(knownBooks[0]))
+assert resp.status_code == 400
+
 
 sleep(WAIT) # waiting for the changes to propagate
 
@@ -109,6 +117,7 @@ assert j.loads(resp.text)['id'] == knownBooks[1]
 resp = r.get(url + "/books?checkedIn=false")
 assert resp.status_code == 200
 assert len(j.loads(resp.text)) == 1
+
 
 # Check in a book
 resp = r.delete(url + "/customers/" + str(customers[0]) + "/books/" + str(knownBooks[1]))
