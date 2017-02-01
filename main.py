@@ -19,7 +19,7 @@
 from google.appengine.ext import ndb
 import json
 import webapp2
-
+from webapp2 import Route
 
 def qsToJson(query):
     items = []
@@ -39,8 +39,8 @@ def getEntity(response, model, id=None):
             b_d = {}
         response.write(json.dumps(b_d))
     else:
-        books = Book.query()
-        response.write(json.dumps(qsToJson(books)))
+        entities = model.query()
+        response.write(json.dumps(qsToJson(entities)))
 
 def deleteEntity(model, id=None):
     if id:
@@ -65,7 +65,6 @@ def patchEntity(patch, model, id=None):
                     e_d[key] = patch_json[key]
             e.populate(**e_d)
             e.put()
-
 
 class Book(ndb.Model):
     title = ndb.StringProperty(required=True)
@@ -115,6 +114,7 @@ class BookHandler(webapp2.RequestHandler):
         book.put()
         book_d = book.to_dict()
         book_d['id'] = book.key.id()
+        self.response.status = 201
         self.response.write(json.dumps(book_d))
 
     def delete(self, id=None):
@@ -131,8 +131,8 @@ class CustomerHandler(webapp2.RequestHandler):
 
     def post(self):
         customer_json = json.loads(self.request.body)
-        customer_id = Customer.query().count()+1
-        customer_key = ndb.Key(Customer, customer_id);
+        customer_id = getID(Customer)
+        customer_key = ndb.Key(Customer, customer_id)
         customer = Customer(name=customer_json['name'],
                             balance=customer_json.get('balance', None),
                             checked_out=customer_json.get('checked_out', []),
@@ -140,6 +140,7 @@ class CustomerHandler(webapp2.RequestHandler):
         customer.put()
         c_d = customer.to_dict()
         c_d['id'] = customer.key.id()
+        self.response.status = 201
         self.response.write(json.dumps(c_d))
 
     def delete(self, id):
@@ -156,6 +157,7 @@ class CheckoutHandler(webapp2.RequestHandler):
         customer.put()
         book.checkedIn = False
         book.put()
+        self.response.status = 201
 
     def delete(self, customer_id, book_id):
         customer = ndb.Key(Customer, int(customer_id)).get()
@@ -169,11 +171,21 @@ allowed_methods = webapp2.WSGIApplication.allowed_methods
 new_allowed_methods = allowed_methods.union(('PATCH',))
 webapp2.WSGIApplication.allowed_methods = new_allowed_methods
 
+# app = webapp2.WSGIApplication([
+#     ('/', MainHandler),
+#     (r'/books', BookHandler),
+#     (r'/books/(\d+)', BookHandler),
+#     (r'/customers', CustomerHandler),
+#     (r'/customers/(\d+)', CustomerHandler),
+#     (r'/customers/(\d+)/books/(\d+)', CheckoutHandler)
+# ], debug=True)
+
 app = webapp2.WSGIApplication([
-    ('/', MainHandler),
-    (r'/books', BookHandler),
-    (r'/books/(\d+)', BookHandler),
-    (r'/customers', CustomerHandler),
-    (r'/customers/(\d+)', CustomerHandler),
-    (r'/customers/(\d+)/books/(\d+)', CheckoutHandler)
+    Route('/', handler=MainHandler, name='main'),
+    Route('/books', handler=BookHandler, name='books'),
+    Route('/books/<id:\d+>', handler=BookHandler, name='book'),
+    Route('/customers', handler=CustomerHandler, name='customers'),
+    Route('/customers/<id:\d+>', handler=CustomerHandler, name='customer'),
+    Route('/customers/<id:\d+>/books', handler=CustomerHandler, name='customer books'),
+    Route('/customers/<customer_id:\d+>/books/<book_id:\d+>', handler=CheckoutHandler, name='checkout book')
 ], debug=True)
